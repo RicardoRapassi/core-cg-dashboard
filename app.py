@@ -1,10 +1,8 @@
 import streamlit as st
 import plotly.express as px
 import plotly.graph_objects as go
-from plotly.subplots import make_subplots
 import pandas as pd
 
-# ── PAGE CONFIG ───────────────────────────────────────────────────────────────
 st.set_page_config(
     page_title="CORE/CG · Dashboard Regulação",
     page_icon="🏥",
@@ -12,615 +10,458 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# ── THEME COLORS ──────────────────────────────────────────────────────────────
-NAVY   = "#1e2d45"
-BLUE   = "#2563eb"
-AMBER  = "#f59e0b"
-GREEN  = "#10b981"
-RED    = "#ef4444"
-GRAY   = "#64748b"
+NAVY  = "#1e2d45"
+BLUE  = "#2563eb"
+AMBER = "#f59e0b"
+GREEN = "#10b981"
+RED   = "#ef4444"
+GRAY  = "#64748b"
 
-# ── CUSTOM CSS ────────────────────────────────────────────────────────────────
 st.markdown("""
 <style>
-/* Sidebar */
-[data-testid="stSidebar"] {
-    background-color: #1e2d45;
-}
-[data-testid="stSidebar"] * {
-    color: #e2e8f0 !important;
-}
-[data-testid="stSidebar"] .stSelectbox label,
-[data-testid="stSidebar"] .stMultiSelect label,
-[data-testid="stSidebar"] h1, h2, h3 {
-    color: #93c5fd !important;
-    font-weight: 600;
-}
-/* KPI cards */
+[data-testid="stSidebar"] { background-color: #1e2d45; }
+[data-testid="stSidebar"] * { color: #e2e8f0 !important; }
+[data-testid="stSidebar"] .stMultiSelect span { color: #1e2d45 !important; }
 .kpi-card {
-    background: white;
-    border-radius: 10px;
-    padding: 18px 22px;
-    border-left: 5px solid #2563eb;
-    box-shadow: 0 1px 4px rgba(0,0,0,0.08);
-    margin-bottom: 4px;
+    background: white; border-radius: 10px; padding: 16px 20px;
+    border-left: 5px solid #2563eb; margin-bottom: 4px;
 }
-.kpi-label  { font-size: 12px; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 4px; }
-.kpi-value  { font-size: 28px; font-weight: 700; color: #1e2d45; line-height: 1.1; }
-.kpi-delta  { font-size: 12px; margin-top: 4px; font-weight: 600; }
-.kpi-up     { color: #10b981; }
-.kpi-down   { color: #ef4444; }
-.kpi-neutral{ color: #f59e0b; }
-.section-header {
-    font-size: 15px; font-weight: 700; color: #1e2d45;
-    padding: 6px 12px; background: #dbeafe;
-    border-radius: 6px; margin: 18px 0 10px 0;
-    border-left: 4px solid #2563eb;
-}
-div[data-testid="stMetricValue"] { font-size: 28px !important; }
+.kpi-label { font-size: 11px; color: #64748b; font-weight: 600;
+             text-transform: uppercase; letter-spacing: .5px; margin-bottom: 4px; }
+.kpi-value { font-size: 26px; font-weight: 700; color: #1e2d45; line-height: 1.1; }
+.kpi-delta { font-size: 12px; margin-top: 4px; font-weight: 600; }
+.kpi-up    { color: #10b981; }
+.kpi-down  { color: #ef4444; }
+.kpi-neu   { color: #f59e0b; }
+.sec { font-size: 14px; font-weight: 700; color: #1e2d45; padding: 6px 12px;
+       background: #dbeafe; border-radius: 6px; margin: 16px 0 10px 0;
+       border-left: 4px solid #2563eb; }
 </style>
 """, unsafe_allow_html=True)
 
-# ════════════════════════════════════════════════════════════════════════════
-# DATA
-# ════════════════════════════════════════════════════════════════════════════
+# ── DADOS ────────────────────────────────────────────────────────────────────
 @st.cache_data
-def load_data():
-    # ── Mensal ────────────────────────────────────────────────────────────
-    mensal = pd.DataFrame([
-        {"Ano":2025,"Mes":"Janeiro",  "Num":1,"Encaminhamentos":3700,"Tempo_Med_Min":651},
-        {"Ano":2025,"Mes":"Fevereiro","Num":2,"Encaminhamentos":3441,"Tempo_Med_Min":688},
-        {"Ano":2025,"Mes":"Março",    "Num":3,"Encaminhamentos":3700,"Tempo_Med_Min":771},
-        {"Ano":2025,"Mes":"Abril",    "Num":4,"Encaminhamentos":3549,"Tempo_Med_Min":983},
-        {"Ano":2025,"Mes":"Maio*",    "Num":5,"Encaminhamentos":2299,"Tempo_Med_Min":962},
-        {"Ano":2026,"Mes":"Janeiro",  "Num":1,"Encaminhamentos":4535,"Tempo_Med_Min":719},
-        {"Ano":2026,"Mes":"Fevereiro","Num":2,"Encaminhamentos":4120,"Tempo_Med_Min":685},
-        {"Ano":2026,"Mes":"Março",    "Num":3,"Encaminhamentos":4718,"Tempo_Med_Min":698},
-        {"Ano":2026,"Mes":"Abril",    "Num":4,"Encaminhamentos":4834,"Tempo_Med_Min":785},
-        {"Ano":2026,"Mes":"Maio*",    "Num":5,"Encaminhamentos":3002,"Tempo_Med_Min":683},
-    ])
-    mensal["Tempo_Med_Horas"] = mensal["Tempo_Med_Min"] / 60
+def load():
+    df = pd.read_csv("dados.csv")
+    return df
 
-    # ── Faixa etária ──────────────────────────────────────────────────────
-    faixa = pd.DataFrame([
-        {"Faixa":"0–11 anos","Grupo":"Criança",     "Ano":2025,"Qtd":2043},
-        {"Faixa":"12–17 anos","Grupo":"Adolescente","Ano":2025,"Qtd":716},
-        {"Faixa":"18–59 anos","Grupo":"Adulto",     "Ano":2025,"Qtd":8924},
-        {"Faixa":"60+ anos",  "Grupo":"Idoso",      "Ano":2025,"Qtd":5006},
-        {"Faixa":"0–11 anos", "Grupo":"Criança",    "Ano":2026,"Qtd":2480},
-        {"Faixa":"12–17 anos","Grupo":"Adolescente","Ano":2026,"Qtd":1138},
-        {"Faixa":"18–59 anos","Grupo":"Adulto",     "Ano":2026,"Qtd":11463},
-        {"Faixa":"60+ anos",  "Grupo":"Idoso",      "Ano":2026,"Qtd":5749},
-    ])
+df_raw = load()
 
-    # ── Tempo de permanência ──────────────────────────────────────────────
-    tempo = pd.DataFrame([
-        {"Faixa":"< 1h",    "Horas_Max":1,  "Ano":2025,"Qtd":3639,"Classif":"Rápido"},
-        {"Faixa":"1–2h",    "Horas_Max":2,  "Ano":2025,"Qtd":2504,"Classif":"Rápido"},
-        {"Faixa":"2–4h",    "Horas_Max":4,  "Ano":2025,"Qtd":2122,"Classif":"Adequado"},
-        {"Faixa":"4–8h",    "Horas_Max":8,  "Ano":2025,"Qtd":2047,"Classif":"Moderado"},
-        {"Faixa":"8–24h",   "Horas_Max":24, "Ano":2025,"Qtd":4001,"Classif":"Prolongado"},
-        {"Faixa":"> 24h",   "Horas_Max":999,"Ano":2025,"Qtd":2000,"Classif":"Crítico"},
-        {"Faixa":"< 1h",    "Horas_Max":1,  "Ano":2026,"Qtd":4465,"Classif":"Rápido"},
-        {"Faixa":"1–2h",    "Horas_Max":2,  "Ano":2026,"Qtd":3531,"Classif":"Rápido"},
-        {"Faixa":"2–4h",    "Horas_Max":4,  "Ano":2026,"Qtd":3159,"Classif":"Adequado"},
-        {"Faixa":"4–8h",    "Horas_Max":8,  "Ano":2026,"Qtd":2693,"Classif":"Moderado"},
-        {"Faixa":"8–24h",   "Horas_Max":24, "Ano":2026,"Qtd":4854,"Classif":"Prolongado"},
-        {"Faixa":"> 24h",   "Horas_Max":999,"Ano":2026,"Qtd":2230,"Classif":"Crítico"},
-    ])
-
-    # ── CIDs ──────────────────────────────────────────────────────────────
-    cids = pd.DataFrame([
-        {"CID":"R100","Diagnostico":"Abdome agudo",            "Especialidade":"Cirurgia Geral","Ano":2025,"Qtd":387},
-        {"CID":"J189","Diagnostico":"Pneumonia",               "Especialidade":"Clínica Médica","Ano":2025,"Qtd":524},
-        {"CID":"I64", "Diagnostico":"AVC",                    "Especialidade":"Neurologia",     "Ano":2025,"Qtd":379},
-        {"CID":"I219","Diagnostico":"IAM",                    "Especialidade":"Cardiologia",    "Ano":2025,"Qtd":412},
-        {"CID":"K359","Diagnostico":"Apendicite aguda",        "Especialidade":"Cirurgia Geral","Ano":2025,"Qtd":334},
-        {"CID":"S099","Diagnostico":"Traumatismo da cabeça",   "Especialidade":"Neurocirurgia", "Ano":2025,"Qtd":341},
-        {"CID":"S525","Diagnostico":"Fratura rádio distal",    "Especialidade":"Ortopedia",     "Ano":2025,"Qtd":279},
-        {"CID":"S626","Diagnostico":"Fratura de dedos",        "Especialidade":"Ortopedia",     "Ano":2025,"Qtd":147},
-        {"CID":"S069","Diagnostico":"Traum. intracraniano",    "Especialidade":"Neurocirurgia", "Ano":2025,"Qtd":235},
-        {"CID":"R074","Diagnostico":"Dor torácica",            "Especialidade":"Cardiologia",   "Ano":2025,"Qtd":84},
-        {"CID":"T150","Diagnostico":"Corp. estr. córnea",      "Especialidade":"Oftalmologia",  "Ano":2025,"Qtd":207},
-        {"CID":"S430","Diagnostico":"Luxação ombro",           "Especialidade":"Ortopedia",     "Ano":2025,"Qtd":163},
-        {"CID":"N390","Diagnostico":"ITU",                    "Especialidade":"Clínica Médica","Ano":2025,"Qtd":175},
-        {"CID":"J180","Diagnostico":"Broncopneumonia",         "Especialidade":"Clínica Médica","Ano":2025,"Qtd":152},
-        {"CID":"F192","Diagnostico":"Transt. por drogas",      "Especialidade":"Psiquiatria",   "Ano":2025,"Qtd":174},
-        {"CID":"A419","Diagnostico":"Septicemia",              "Especialidade":"Clínica Médica","Ano":2025,"Qtd":143},
-        {"CID":"S420","Diagnostico":"Fratura clavícula",       "Especialidade":"Ortopedia",     "Ano":2025,"Qtd":98},
-        {"CID":"T159","Diagnostico":"Corp. estr. olho",        "Especialidade":"Oftalmologia",  "Ano":2025,"Qtd":168},
-        {"CID":"I200","Diagnostico":"Angina instável",         "Especialidade":"Cardiologia",   "Ano":2025,"Qtd":128},
-        {"CID":"S925","Diagnostico":"Fratura artelho",         "Especialidade":"Ortopedia",     "Ano":2025,"Qtd":50},
-        {"CID":"R100","Diagnostico":"Abdome agudo",            "Especialidade":"Cirurgia Geral","Ano":2026,"Qtd":462},
-        {"CID":"J189","Diagnostico":"Pneumonia",               "Especialidade":"Clínica Médica","Ano":2026,"Qtd":311},
-        {"CID":"I64", "Diagnostico":"AVC",                    "Especialidade":"Neurologia",     "Ano":2026,"Qtd":416},
-        {"CID":"I219","Diagnostico":"IAM",                    "Especialidade":"Cardiologia",    "Ano":2026,"Qtd":299},
-        {"CID":"K359","Diagnostico":"Apendicite aguda",        "Especialidade":"Cirurgia Geral","Ano":2026,"Qtd":361},
-        {"CID":"S099","Diagnostico":"Traumatismo da cabeça",   "Especialidade":"Neurocirurgia", "Ano":2026,"Qtd":270},
-        {"CID":"S525","Diagnostico":"Fratura rádio distal",    "Especialidade":"Ortopedia",     "Ano":2026,"Qtd":323},
-        {"CID":"S626","Diagnostico":"Fratura de dedos",        "Especialidade":"Ortopedia",     "Ano":2026,"Qtd":379},
-        {"CID":"S069","Diagnostico":"Traum. intracraniano",    "Especialidade":"Neurocirurgia", "Ano":2026,"Qtd":258},
-        {"CID":"R074","Diagnostico":"Dor torácica",            "Especialidade":"Cardiologia",   "Ano":2026,"Qtd":368},
-        {"CID":"T150","Diagnostico":"Corp. estr. córnea",      "Especialidade":"Oftalmologia",  "Ano":2026,"Qtd":237},
-        {"CID":"S430","Diagnostico":"Luxação ombro",           "Especialidade":"Ortopedia",     "Ano":2026,"Qtd":226},
-        {"CID":"N390","Diagnostico":"ITU",                    "Especialidade":"Clínica Médica","Ano":2026,"Qtd":189},
-        {"CID":"J180","Diagnostico":"Broncopneumonia",         "Especialidade":"Clínica Médica","Ano":2026,"Qtd":187},
-        {"CID":"F192","Diagnostico":"Transt. por drogas",      "Especialidade":"Psiquiatria",   "Ano":2026,"Qtd":164},
-        {"CID":"A419","Diagnostico":"Septicemia",              "Especialidade":"Clínica Médica","Ano":2026,"Qtd":170},
-        {"CID":"S420","Diagnostico":"Fratura clavícula",       "Especialidade":"Ortopedia",     "Ano":2026,"Qtd":213},
-        {"CID":"T159","Diagnostico":"Corp. estr. olho",        "Especialidade":"Oftalmologia",  "Ano":2026,"Qtd":133},
-        {"CID":"I200","Diagnostico":"Angina instável",         "Especialidade":"Cardiologia",   "Ano":2026,"Qtd":168},
-        {"CID":"S925","Diagnostico":"Fratura artelho",         "Especialidade":"Ortopedia",     "Ano":2026,"Qtd":243},
-    ])
-
-    return mensal, faixa, tempo, cids
-
-mensal_df, faixa_df, tempo_df, cids_df = load_data()
-
-# ════════════════════════════════════════════════════════════════════════════
-# SIDEBAR — FILTROS
-# ════════════════════════════════════════════════════════════════════════════
+# ── SIDEBAR ──────────────────────────────────────────────────────────────────
 with st.sidebar:
     st.markdown("## 🏥 CORE/CG")
     st.markdown("**Rede de Urgência e Emergência**  \nCampo Grande · MS")
     st.markdown("---")
-
     st.markdown("### Filtros")
 
-    anos = st.multiselect(
-        "Ano",
-        options=[2025, 2026],
-        default=[2025, 2026],
-    )
+    anos_op = sorted(df_raw["Ano"].unique().tolist())
+    anos = st.multiselect("Ano", anos_op, default=anos_op)
 
-    meses_disp = ["Janeiro","Fevereiro","Março","Abril","Maio*"]
-    meses_sel = st.multiselect(
-        "Mês",
-        options=meses_disp,
-        default=meses_disp,
-    )
+    meses_op = ["Janeiro","Fevereiro","Março","Abril","Maio*"]
+    meses = st.multiselect("Mês", meses_op, default=meses_op)
 
-    especialidades_disp = sorted(cids_df["Especialidade"].unique().tolist())
-    esp_sel = st.multiselect(
-        "Especialidade (CIDs)",
-        options=especialidades_disp,
-        default=especialidades_disp,
-    )
+    unidades_op = sorted(df_raw["Unidade"].dropna().unique().tolist())
+    unidades = st.multiselect("Unidade de origem", unidades_op, default=unidades_op)
 
-    top_n = st.slider("Top N diagnósticos", min_value=5, max_value=20, value=10, step=1)
+    top_n = st.slider("Top N diagnósticos (CIDs)", 5, 20, 10)
 
     st.markdown("---")
-    st.markdown("### Comparativo rápido")
-    metrica = st.radio(
-        "Métrica principal",
-        ["Encaminhamentos", "Tempo médio (min)"],
-        index=0,
-    )
-
-    st.markdown("---")
-    st.caption("*Maio/2026: dados parciais até 20/05/2026")
+    st.caption("*Maio/2026: parcial até 20/05/2026")
     st.caption("Fonte: CORE/CG · Sistema de Regulação")
 
-# ── aplicar filtros ───────────────────────────────────────────────────────────
-if not anos:
-    anos = [2025, 2026]
+# ── FILTRO PRINCIPAL ──────────────────────────────────────────────────────────
+if not anos:    anos    = anos_op
+if not meses:   meses   = meses_op
+if not unidades: unidades = unidades_op
 
-mensal_f = mensal_df[
-    mensal_df["Ano"].isin(anos) &
-    mensal_df["Mes"].isin(meses_sel)
-]
-faixa_f = faixa_df[faixa_df["Ano"].isin(anos)]
-tempo_f  = tempo_df[tempo_df["Ano"].isin(anos)]
-cids_f   = cids_df[
-    cids_df["Ano"].isin(anos) &
-    cids_df["Especialidade"].isin(esp_sel)
-]
+df = df_raw[
+    df_raw["Ano"].isin(anos) &
+    df_raw["Mes"].isin(meses) &
+    df_raw["Unidade"].isin(unidades)
+].copy()
 
-# ════════════════════════════════════════════════════════════════════════════
-# HEADER
-# ════════════════════════════════════════════════════════════════════════════
-col_logo, col_title = st.columns([1, 9])
-with col_title:
-    st.markdown(
-        "<h1 style='margin:0;color:#1e2d45;font-size:24px;font-weight:700'>"
-        "CORE/CG — Painel de Encaminhamentos · Jan–Mai 2025 vs 2026</h1>",
-        unsafe_allow_html=True,
-    )
-    st.markdown(
-        "<p style='color:#64748b;font-size:13px;margin-top:2px'>"
-        "Central de Regulação de Ofertas de Serviços de Saúde · Campo Grande/MS</p>",
-        unsafe_allow_html=True,
-    )
+color_map = {2025: GRAY, 2026: BLUE}
+mes_order = ["Janeiro","Fevereiro","Março","Abril","Maio*"]
 
+# ── HEADER ────────────────────────────────────────────────────────────────────
+st.markdown(
+    "<h1 style='margin:0;color:#1e2d45;font-size:22px;font-weight:700'>"
+    "CORE/CG — Painel de Encaminhamentos · Jan–Mai 2025 vs 2026</h1>",
+    unsafe_allow_html=True)
+st.markdown(
+    "<p style='color:#64748b;font-size:13px;margin-top:2px'>"
+    "Central de Regulação de Ofertas de Serviços de Saúde · Campo Grande/MS</p>",
+    unsafe_allow_html=True)
 st.divider()
 
-# ════════════════════════════════════════════════════════════════════════════
-# KPI CARDS
-# ════════════════════════════════════════════════════════════════════════════
-anos_selecionados = sorted(anos)
-
-def safe_total(df, ano_val, col):
-    sub = df[df["Ano"] == ano_val]
-    return sub[col].sum() if len(sub) > 0 else 0
-
-def kpi_card(label, value, delta_text, delta_type="up", color=BLUE):
-    delta_class = {"up": "kpi-up", "down": "kpi-down", "neutral": "kpi-neutral"}[delta_type]
-    return f"""
-    <div class="kpi-card" style="border-left-color:{color}">
+# ── KPIs ──────────────────────────────────────────────────────────────────────
+def kpi(label, value, delta, dtype="neu", color=BLUE):
+    cls = {"up":"kpi-up","down":"kpi-down","neu":"kpi-neu"}[dtype]
+    return f"""<div class="kpi-card" style="border-left-color:{color}">
         <div class="kpi-label">{label}</div>
         <div class="kpi-value">{value}</div>
-        <div class="kpi-delta {delta_class}">{delta_text}</div>
-    </div>
-    """
+        <div class="kpi-delta {cls}">{delta}</div></div>"""
 
-k1, k2, k3, k4, k5 = st.columns(5)
+k1,k2,k3,k4,k5 = st.columns(5)
 
+# total encaminhamentos
+t25 = len(df[df["Ano"]==2025])
+t26 = len(df[df["Ano"]==2026])
 with k1:
-    t25 = safe_total(mensal_f, 2025, "Encaminhamentos")
-    t26 = safe_total(mensal_f, 2026, "Encaminhamentos")
-    if 2025 in anos and 2026 in anos and t25 > 0:
-        pct = (t26 - t25) / t25 * 100
-        delta = f"▲ {pct:.1f}% vs 2025"
-        dt = "up"
+    if t25>0 and t26>0:
+        pct = (t26-t25)/t25*100
+        delta = f"{'▲' if pct>=0 else '▼'} {abs(pct):.1f}% vs 2025"
+        dt = "up" if pct>=0 else "down"
     else:
-        delta = "—"
-        dt = "neutral"
-    total_show = f"{t26:,}".replace(",",".") if 2026 in anos else f"{t25:,}".replace(",",".")
-    st.markdown(kpi_card("Total encaminhamentos", total_show, delta, dt, BLUE),
+        delta = "—"; dt = "neu"
+    total = t26 if 2026 in anos else t25
+    st.markdown(kpi("Total encaminhamentos", f"{total:,}".replace(",","."), delta, dt, BLUE),
                 unsafe_allow_html=True)
 
+# tempo médio
 with k2:
-    m26 = mensal_df[mensal_df["Ano"]==2026]["Tempo_Med_Min"].mean() if 2026 in anos else None
-    m25 = mensal_df[mensal_df["Ano"]==2025]["Tempo_Med_Min"].mean() if 2025 in anos else None
-    val = m26 if m26 else m25
-    h, mn = int(val)//60, int(val)%60
-    if m25 and m26:
-        pct = (m26 - m25) / m25 * 100
+    m25 = df[df["Ano"]==2025]["Tempo_Min"].mean()
+    m26 = df[df["Ano"]==2026]["Tempo_Min"].mean()
+    ref = m26 if not pd.isna(m26) else m25
+    h,mn = int(ref)//60, int(ref)%60
+    if not pd.isna(m25) and not pd.isna(m26):
+        pct = (m26-m25)/m25*100
         delta = f"{'▼' if pct<0 else '▲'} {abs(pct):.1f}% vs 2025"
-        dt = "up" if pct < 0 else "down"
+        dt = "up" if pct<0 else "down"
     else:
-        delta = "—"
-        dt = "neutral"
-    st.markdown(kpi_card("Tempo médio de espera", f"{h}h {mn:02d}min", delta, dt, AMBER),
+        delta = "—"; dt = "neu"
+    st.markdown(kpi("Tempo médio de espera", f"{h}h {mn:02d}min", delta, dt, AMBER),
                 unsafe_allow_html=True)
 
+# acima 24h
 with k3:
-    acima_25 = 2000
-    acima_26 = 2230
-    pct_25 = 12.3
-    pct_26 = 10.7
-    if 2026 in anos:
-        st.markdown(kpi_card("Acima de 24h (2026)", f"{acima_26:,}".replace(",","."),
-                              f"▼ {pct_25-pct_26:.1f} p.p. · era {pct_25}%", "up", GREEN),
-                    unsafe_allow_html=True)
+    ac26 = len(df[(df["Ano"]==2026)&(df["Faixa_Tempo"]=="> 24h")])
+    tot26 = len(df[df["Ano"]==2026])
+    ac25 = len(df[(df["Ano"]==2025)&(df["Faixa_Tempo"]=="> 24h")])
+    tot25 = len(df[df["Ano"]==2025])
+    pct26 = ac26/tot26*100 if tot26>0 else 0
+    pct25 = ac25/tot25*100 if tot25>0 else 0
+    ref_n = ac26 if 2026 in anos else ac25
+    ref_p = pct26 if 2026 in anos else pct25
+    if tot25>0 and tot26>0:
+        chg = pct26-pct25
+        delta = f"{'▲' if chg>0 else '▼'} {abs(chg):.1f} p.p. vs 2025"
+        dt = "down" if chg>0 else "up"
     else:
-        st.markdown(kpi_card("Acima de 24h (2025)", f"{acima_25:,}".replace(",","."),
-                              f"{pct_25}% do total", "neutral", GRAY),
-                    unsafe_allow_html=True)
-
-with k4:
-    best_mes = mensal_df[mensal_df["Ano"].isin(anos)].groupby("Mes")["Encaminhamentos"].sum().idxmax() if not mensal_f.empty else "—"
-    best_val = mensal_df[mensal_df["Ano"].isin(anos)].groupby("Mes")["Encaminhamentos"].sum().max() if not mensal_f.empty else 0
-    st.markdown(kpi_card("Mês com maior volume",
-                          best_mes.replace("*",""),
-                          f"{best_val:,} encaminhamentos".replace(",","."),
-                          "neutral", "#8b5cf6"),
+        delta = f"{ref_p:.1f}% do total"; dt = "neu"
+    st.markdown(kpi("Acima de 24h", f"{ref_n:,}".replace(",","."), delta, dt, RED),
                 unsafe_allow_html=True)
 
-with k5:
-    top_cid = cids_f.groupby(["CID","Diagnostico"])["Qtd"].sum().reset_index().sort_values("Qtd", ascending=False)
-    if not top_cid.empty:
-        tc = top_cid.iloc[0]
-        st.markdown(kpi_card("CID mais frequente", tc["CID"],
-                              f"{tc['Diagnostico']} · {int(tc['Qtd']):,} casos".replace(",","."),
-                              "neutral", RED),
+# mês com maior volume
+with k4:
+    if not df.empty:
+        mes_vol = df.groupby("Mes").size()
+        best_mes = mes_vol.idxmax()
+        best_val = mes_vol.max()
+        st.markdown(kpi("Mês com maior volume", best_mes.replace("*",""),
+                         f"{best_val:,} encaminhamentos".replace(",","."), "neu", "#8b5cf6"),
                     unsafe_allow_html=True)
+    else:
+        st.markdown(kpi("Mês com maior volume","—","—"), unsafe_allow_html=True)
 
-st.markdown("<div style='margin-top:12px'></div>", unsafe_allow_html=True)
+# unidade mais ativa
+with k5:
+    if not df.empty:
+        top_u = df["Unidade"].value_counts().idxmax()
+        top_u_n = df["Unidade"].value_counts().max()
+        st.markdown(kpi("Unidade mais ativa", top_u.split()[-1],
+                         f"{top_u_n:,} encaminhamentos".replace(",","."), "neu", GREEN),
+                    unsafe_allow_html=True)
+    else:
+        st.markdown(kpi("Unidade mais ativa","—","—"), unsafe_allow_html=True)
 
-# ════════════════════════════════════════════════════════════════════════════
-# LINHA 1 — Evolução mensal + Tempo médio
-# ════════════════════════════════════════════════════════════════════════════
-st.markdown("<div class='section-header'>📅 Evolução Mensal</div>", unsafe_allow_html=True)
-c1, c2 = st.columns(2)
+st.markdown("<div style='margin-top:10px'></div>", unsafe_allow_html=True)
+
+# ── EVOLUÇÃO MENSAL ────────────────────────────────────────────────────────────
+st.markdown("<div class='sec'>📅 Evolução Mensal</div>", unsafe_allow_html=True)
+c1,c2 = st.columns(2)
+
+mensal_enc = (df.groupby(["Ano","Mes","Mes_Num"])
+              .size().reset_index(name="Encaminhamentos"))
+mensal_enc = mensal_enc.sort_values("Mes_Num")
+
+mensal_tmp = (df.groupby(["Ano","Mes","Mes_Num"])["Tempo_Min"]
+              .mean().reset_index())
+mensal_tmp = mensal_tmp.sort_values("Mes_Num")
+mensal_tmp["Horas"] = mensal_tmp["Tempo_Min"]/60
 
 with c1:
-    color_map = {2025: GRAY, 2026: BLUE}
-    fig_bar = go.Figure()
-    ordem_meses = ["Janeiro","Fevereiro","Março","Abril","Maio*"]
-    mensal_sorted = mensal_f.copy()
-    mensal_sorted["Mes_Ord"] = mensal_sorted["Mes"].apply(
-        lambda x: ordem_meses.index(x) if x in ordem_meses else 99)
-    mensal_sorted = mensal_sorted.sort_values("Mes_Ord")
-
+    fig = go.Figure()
     for ano in sorted(anos):
-        d = mensal_sorted[mensal_sorted["Ano"]==ano]
-        fig_bar.add_trace(go.Bar(
-            x=d["Mes"].str.replace("*","", regex=False),
+        d = mensal_enc[mensal_enc["Ano"]==ano]
+        fig.add_trace(go.Bar(
+            x=d["Mes"].str.replace("*","",regex=False),
             y=d["Encaminhamentos"],
             name=str(ano),
-            marker_color=color_map.get(ano, GRAY),
-            text=d["Encaminhamentos"].apply(lambda v: f"{v:,}".replace(",",".")),
-            textposition="outside",
-            textfont=dict(size=10),
+            marker_color=color_map.get(ano,GRAY),
+            text=d["Encaminhamentos"].apply(lambda v: f"{int(v):,}".replace(",",".")),
+            textposition="outside", textfont=dict(size=10),
         ))
-    fig_bar.update_layout(
-        title="Encaminhamentos por mês",
-        barmode="group",
-        plot_bgcolor="white",
-        paper_bgcolor="white",
-        legend=dict(orientation="h", y=1.12, x=0),
-        margin=dict(t=60, b=30, l=10, r=10),
-        yaxis=dict(gridcolor="#f0f2f5", title=""),
-        xaxis=dict(title=""),
-        font=dict(family="Arial", size=12),
-        height=320,
-    )
-    st.plotly_chart(fig_bar, use_container_width=True)
+    fig.update_layout(title="Encaminhamentos por mês", barmode="group",
+        plot_bgcolor="white", paper_bgcolor="white", height=320,
+        legend=dict(orientation="h",y=1.12,x=0),
+        margin=dict(t=55,b=25,l=10,r=10),
+        yaxis=dict(gridcolor="#f0f2f5"), font=dict(family="Arial",size=11))
+    st.plotly_chart(fig, use_container_width=True)
 
 with c2:
-    fig_line = go.Figure()
+    fig2 = go.Figure()
     for ano in sorted(anos):
-        d = mensal_f[mensal_f["Ano"]==ano].copy()
-        d["Mes_Ord"] = d["Mes"].apply(lambda x: ordem_meses.index(x) if x in ordem_meses else 99)
-        d = d.sort_values("Mes_Ord")
-        horas = (d["Tempo_Med_Min"] / 60).round(2)
-        labels = d["Tempo_Med_Min"].apply(
-            lambda v: f"{int(v)//60}h {int(v)%60:02d}min")
-        fig_line.add_trace(go.Scatter(
-            x=d["Mes"].str.replace("*","", regex=False),
-            y=horas,
-            mode="lines+markers+text",
+        d = mansal_tmp = mensal_tmp[mensal_tmp["Ano"]==ano]
+        labels = d["Tempo_Min"].apply(lambda v: f"{int(v)//60}h {int(v)%60:02d}min" if not pd.isna(v) else "")
+        fig2.add_trace(go.Scatter(
+            x=d["Mes"].str.replace("*","",regex=False),
+            y=d["Horas"], mode="lines+markers+text",
             name=str(ano),
-            line=dict(color=color_map.get(ano, GRAY), width=2.5),
-            marker=dict(size=8),
-            text=labels,
-            textposition="top center",
-            textfont=dict(size=9),
+            line=dict(color=color_map.get(ano,GRAY),width=2.5),
+            marker=dict(size=8), text=labels,
+            textposition="top center", textfont=dict(size=9),
         ))
-    fig_line.update_layout(
-        title="Tempo médio de espera por mês",
-        plot_bgcolor="white",
-        paper_bgcolor="white",
-        legend=dict(orientation="h", y=1.12, x=0),
-        margin=dict(t=60, b=30, l=10, r=10),
-        yaxis=dict(gridcolor="#f0f2f5", title="horas"),
-        xaxis=dict(title=""),
-        font=dict(family="Arial", size=12),
-        height=320,
-    )
-    st.plotly_chart(fig_line, use_container_width=True)
+    fig2.update_layout(title="Tempo médio de espera por mês",
+        plot_bgcolor="white", paper_bgcolor="white", height=320,
+        legend=dict(orientation="h",y=1.12,x=0),
+        margin=dict(t=55,b=25,l=10,r=10),
+        yaxis=dict(gridcolor="#f0f2f5",title="horas"),
+        font=dict(family="Arial",size=11))
+    st.plotly_chart(fig2, use_container_width=True)
 
-# ════════════════════════════════════════════════════════════════════════════
-# LINHA 2 — Top CIDs + Especialidades
-# ════════════════════════════════════════════════════════════════════════════
-st.markdown("<div class='section-header'>🏥 Diagnósticos (CIDs)</div>", unsafe_allow_html=True)
-c3, c4 = st.columns([3, 2])
+# ── UNIDADES ───────────────────────────────────────────────────────────────────
+st.markdown("<div class='sec'>🏨 Volume por Unidade de Origem</div>", unsafe_allow_html=True)
+cu1, cu2 = st.columns(2)
 
-with c3:
-    cid_agg = cids_f.groupby(["CID","Diagnostico"])["Qtd"].sum().reset_index()
-    cid_agg = cid_agg.sort_values("Qtd", ascending=True).tail(top_n)
+unid_agg = df.groupby(["Unidade","Ano"]).size().reset_index(name="Qtd")
 
-    fig_cid = go.Figure(go.Bar(
+with cu1:
+    unid_tot = unid_agg.groupby("Unidade")["Qtd"].sum().reset_index()
+    unid_tot = unid_tot.sort_values("Qtd", ascending=True)
+    fig_u = go.Figure(go.Bar(
+        x=unid_tot["Qtd"], y=unid_tot["Unidade"], orientation="h",
+        marker=dict(color=unid_tot["Qtd"],
+                    colorscale=[[0,"#dbeafe"],[1,BLUE]]),
+        text=unid_tot["Qtd"].apply(lambda v: f"{v:,}".replace(",",".")),
+        textposition="outside",
+    ))
+    fig_u.update_layout(title="Total por unidade (período selecionado)",
+        plot_bgcolor="white", paper_bgcolor="white", height=380,
+        margin=dict(t=50,b=20,l=10,r=60),
+        xaxis=dict(gridcolor="#f0f2f5"),
+        font=dict(family="Arial",size=11))
+    st.plotly_chart(fig_u, use_container_width=True)
+
+with cu2:
+    if len(anos) == 2:
+        unid_piv = unid_agg.pivot_table(index="Unidade", columns="Ano",
+                                         values="Qtd", aggfunc="sum", fill_value=0).reset_index()
+        if 2025 in unid_piv.columns and 2026 in unid_piv.columns:
+            unid_piv["Var"] = unid_piv[2026] - unid_piv[2025]
+            unid_piv = unid_piv.sort_values("Var")
+            fig_uv = go.Figure(go.Bar(
+                x=unid_piv["Var"],
+                y=unid_piv["Unidade"],
+                orientation="h",
+                marker_color=[GREEN if v>=0 else RED for v in unid_piv["Var"]],
+                text=unid_piv["Var"].apply(lambda v: f"+{v:,}".replace(",",".") if v>=0 else f"{v:,}".replace(",",".")),
+                textposition="outside",
+            ))
+            fig_uv.add_vline(x=0, line_dash="dash", line_color=GRAY, line_width=1)
+            fig_uv.update_layout(title="Variação por unidade (2025 → 2026)",
+                plot_bgcolor="white", paper_bgcolor="white", height=380,
+                margin=dict(t=50,b=20,l=10,r=60),
+                xaxis=dict(gridcolor="#f0f2f5",title="Δ casos"),
+                font=dict(family="Arial",size=11))
+            st.plotly_chart(fig_uv, use_container_width=True)
+    else:
+        unid_ano = unid_agg[unid_agg["Ano"].isin(anos)].sort_values("Qtd",ascending=True)
+        fig_u2 = px.bar(unid_ano, x="Qtd", y="Unidade", color="Ano",
+                         orientation="h", barmode="group",
+                         color_discrete_map={2025:GRAY,2026:BLUE},
+                         title="Volume por unidade e ano")
+        fig_u2.update_layout(plot_bgcolor="white",paper_bgcolor="white",
+                              height=380, font=dict(family="Arial",size=11),
+                              margin=dict(t=50,b=20,l=10,r=40))
+        st.plotly_chart(fig_u2, use_container_width=True)
+
+# ── DIAGNÓSTICOS ───────────────────────────────────────────────────────────────
+st.markdown("<div class='sec'>🏥 Diagnósticos (CIDs)</div>", unsafe_allow_html=True)
+cd1, cd2 = st.columns([3,2])
+
+cid_agg = (df.dropna(subset=["CID"])
+           .groupby(["CID","Diagnostico"]).size()
+           .reset_index(name="Qtd")
+           .sort_values("Qtd",ascending=True).tail(top_n))
+
+with cd1:
+    fig_c = go.Figure(go.Bar(
         x=cid_agg["Qtd"],
-        y=cid_agg["CID"] + " · " + cid_agg["Diagnostico"],
+        y=cid_agg["CID"] + " · " + cid_agg["Diagnostico"].str[:25],
         orientation="h",
-        marker=dict(
-            color=cid_agg["Qtd"],
-            colorscale=[[0, "#dbeafe"], [1, BLUE]],
-        ),
+        marker=dict(color=cid_agg["Qtd"],colorscale=[[0,"#dbeafe"],[1,BLUE]]),
         text=cid_agg["Qtd"].apply(lambda v: f"{v:,}".replace(",",".")),
         textposition="outside",
     ))
-    fig_cid.update_layout(
-        title=f"Top {top_n} CIDs — volume combinado",
-        plot_bgcolor="white",
-        paper_bgcolor="white",
-        margin=dict(t=50, b=20, l=10, r=60),
-        xaxis=dict(gridcolor="#f0f2f5", title=""),
-        yaxis=dict(title="", tickfont=dict(size=11)),
-        font=dict(family="Arial", size=11),
-        height=max(320, top_n * 34),
-    )
-    st.plotly_chart(fig_cid, use_container_width=True)
+    fig_c.update_layout(
+        title=f"Top {top_n} CIDs", plot_bgcolor="white", paper_bgcolor="white",
+        margin=dict(t=50,b=20,l=10,r=60),
+        xaxis=dict(gridcolor="#f0f2f5"),
+        yaxis=dict(tickfont=dict(size=10)),
+        font=dict(family="Arial",size=11),
+        height=max(320, top_n*34))
+    st.plotly_chart(fig_c, use_container_width=True)
 
-with c4:
-    esp_agg = cids_f.groupby("Especialidade")["Qtd"].sum().reset_index().sort_values("Qtd", ascending=False)
-    palette = [BLUE, AMBER, GREEN, RED, "#8b5cf6", "#ec4899", "#14b8a6", GRAY]
-    colors  = (palette * 4)[:len(esp_agg)]
-
-    fig_pizza = go.Figure(go.Pie(
-        labels=esp_agg["Especialidade"],
-        values=esp_agg["Qtd"],
+with cd2:
+    unid_pizza = df["Unidade"].value_counts().reset_index()
+    unid_pizza.columns = ["Unidade","Qtd"]
+    palette = [BLUE,AMBER,GREEN,RED,"#8b5cf6","#ec4899","#14b8a6",GRAY,"#f97316","#06b6d4","#a855f7","#84cc16"]
+    fig_p = go.Figure(go.Pie(
+        labels=unid_pizza["Unidade"],
+        values=unid_pizza["Qtd"],
         hole=0.45,
-        marker=dict(colors=colors),
-        textinfo="label+percent",
-        textfont=dict(size=11),
-        hovertemplate="%{label}<br>%{value:,} casos<br>%{percent}<extra></extra>",
+        marker=dict(colors=palette[:len(unid_pizza)]),
+        textinfo="percent",
+        textfont=dict(size=10),
+        hovertemplate="%{label}<br>%{value:,} encaminhamentos<br>%{percent}<extra></extra>",
     ))
-    fig_pizza.update_layout(
-        title="Volume por especialidade",
-        plot_bgcolor="white",
-        paper_bgcolor="white",
-        margin=dict(t=50, b=20, l=10, r=10),
-        legend=dict(orientation="v", font=dict(size=10)),
+    fig_p.update_layout(
+        title="Participação por unidade",
+        plot_bgcolor="white", paper_bgcolor="white",
+        margin=dict(t=50,b=20,l=10,r=10),
+        legend=dict(font=dict(size=9), orientation="v"),
         font=dict(family="Arial"),
-        height=max(320, top_n * 34),
-        annotations=[dict(text="CIDs", x=0.5, y=0.5,
-                          font=dict(size=14, color=NAVY), showarrow=False)],
+        height=max(320, top_n*34),
+        annotations=[dict(text="Unidades",x=0.5,y=0.5,
+                          font=dict(size=13,color=NAVY),showarrow=False)],
     )
-    st.plotly_chart(fig_pizza, use_container_width=True)
+    st.plotly_chart(fig_p, use_container_width=True)
 
-# ════════════════════════════════════════════════════════════════════════════
-# LINHA 3 — Faixa etária + Tempo de permanência
-# ════════════════════════════════════════════════════════════════════════════
-st.markdown("<div class='section-header'>👥 Perfil dos Pacientes</div>", unsafe_allow_html=True)
-c5, c6 = st.columns(2)
+# ── PERFIL DOS PACIENTES ────────────────────────────────────────────────────────
+st.markdown("<div class='sec'>👥 Perfil dos Pacientes</div>", unsafe_allow_html=True)
+cp1, cp2 = st.columns(2)
 
-with c5:
-    faixa_piv = faixa_f.pivot_table(index="Faixa", columns="Ano", values="Qtd", aggfunc="sum").reset_index()
-    faixa_order = ["0–11 anos","12–17 anos","18–59 anos","60+ anos"]
-    faixa_piv["_ord"] = faixa_piv["Faixa"].apply(lambda x: faixa_order.index(x) if x in faixa_order else 99)
-    faixa_piv = faixa_piv.sort_values("_ord")
+faixa_agg = df.groupby(["Faixa_Etaria","Ano"]).size().reset_index(name="Qtd")
+faixa_order = ["0–11 anos","12–17 anos","18–59 anos","60+ anos"]
+faixa_agg["_ord"] = faixa_agg["Faixa_Etaria"].apply(
+    lambda x: faixa_order.index(x) if x in faixa_order else 99)
+faixa_agg = faixa_agg.sort_values("_ord")
 
+tempo_agg = df.groupby(["Faixa_Tempo","Ano"]).size().reset_index(name="Qtd")
+tempo_order = ["< 1h","1–2h","2–4h","4–8h","8–24h","> 24h"]
+tempo_agg["_ord"] = tempo_agg["Faixa_Tempo"].apply(
+    lambda x: tempo_order.index(x) if x in tempo_order else 99)
+tempo_agg = tempo_agg.sort_values("_ord")
+
+with cp1:
     fig_fx = go.Figure()
     for ano in sorted(anos):
-        if ano in faixa_piv.columns:
-            fig_fx.add_trace(go.Bar(
-                name=str(ano),
-                x=faixa_piv["Faixa"],
-                y=faixa_piv[ano],
-                marker_color=color_map.get(ano, GRAY),
-                text=faixa_piv[ano].apply(lambda v: f"{int(v):,}".replace(",",".")),
-                textposition="outside",
-                textfont=dict(size=10),
-            ))
-    fig_fx.update_layout(
-        title="Encaminhamentos por faixa etária",
-        barmode="group",
-        plot_bgcolor="white",
-        paper_bgcolor="white",
-        legend=dict(orientation="h", y=1.12, x=0),
-        margin=dict(t=60, b=30, l=10, r=10),
-        yaxis=dict(gridcolor="#f0f2f5", title=""),
-        font=dict(family="Arial", size=12),
-        height=320,
-    )
+        d = faixa_agg[faixa_agg["Ano"]==ano]
+        fig_fx.add_trace(go.Bar(
+            name=str(ano), x=d["Faixa_Etaria"], y=d["Qtd"],
+            marker_color=color_map.get(ano,GRAY),
+            text=d["Qtd"].apply(lambda v: f"{int(v):,}".replace(",",".")),
+            textposition="outside", textfont=dict(size=10),
+        ))
+    fig_fx.update_layout(title="Encaminhamentos por faixa etária",
+        barmode="group", plot_bgcolor="white", paper_bgcolor="white", height=320,
+        legend=dict(orientation="h",y=1.12,x=0),
+        margin=dict(t=55,b=25,l=10,r=10),
+        yaxis=dict(gridcolor="#f0f2f5"), font=dict(family="Arial",size=11))
     st.plotly_chart(fig_fx, use_container_width=True)
 
-with c6:
-    tempo_order = ["< 1h","1–2h","2–4h","4–8h","8–24h","> 24h"]
-    tempo_f2 = tempo_f.copy()
-    tempo_f2["_ord"] = tempo_f2["Faixa"].apply(lambda x: tempo_order.index(x) if x in tempo_order else 99)
-    tempo_f2 = tempo_f2.sort_values("_ord")
-
-    classif_colors = {
-        "Rápido":     GREEN,
-        "Adequado":   BLUE,
-        "Moderado":   AMBER,
-        "Prolongado": "#f97316",
-        "Crítico":    RED,
-    }
-
-    fig_tempo = go.Figure()
+with cp2:
+    fig_tp = go.Figure()
     for ano in sorted(anos):
-        d = tempo_f2[tempo_f2["Ano"]==ano]
-        fig_tempo.add_trace(go.Bar(
-            name=str(ano),
-            x=d["Faixa"],
-            y=d["Qtd"],
-            marker_color=color_map.get(ano, GRAY),
-            text=d["Qtd"].apply(lambda v: f"{v:,}".replace(",",".")),
-            textposition="outside",
-            textfont=dict(size=10),
+        d = tempo_agg[tempo_agg["Ano"]==ano]
+        fig_tp.add_trace(go.Bar(
+            name=str(ano), x=d["Faixa_Tempo"], y=d["Qtd"],
+            marker_color=color_map.get(ano,GRAY),
+            text=d["Qtd"].apply(lambda v: f"{int(v):,}".replace(",",".")),
+            textposition="outside", textfont=dict(size=10),
         ))
-    fig_tempo.update_layout(
-        title="Distribuição do tempo de permanência",
-        barmode="group",
-        plot_bgcolor="white",
-        paper_bgcolor="white",
-        legend=dict(orientation="h", y=1.12, x=0),
-        margin=dict(t=60, b=30, l=10, r=10),
-        yaxis=dict(gridcolor="#f0f2f5", title=""),
-        font=dict(family="Arial", size=12),
-        height=320,
-    )
-    st.plotly_chart(fig_tempo, use_container_width=True)
+    fig_tp.update_layout(title="Distribuição do tempo de permanência",
+        barmode="group", plot_bgcolor="white", paper_bgcolor="white", height=320,
+        legend=dict(orientation="h",y=1.12,x=0),
+        margin=dict(t=55,b=25,l=10,r=10),
+        yaxis=dict(gridcolor="#f0f2f5"), font=dict(family="Arial",size=11))
+    st.plotly_chart(fig_tp, use_container_width=True)
 
-# ════════════════════════════════════════════════════════════════════════════
-# LINHA 4 — Variação CIDs (scatter / waterfall)
-# ════════════════════════════════════════════════════════════════════════════
-st.markdown("<div class='section-header'>📊 Análise de Variação 2025 → 2026</div>",
-            unsafe_allow_html=True)
+# ── VARIAÇÃO CIDs ──────────────────────────────────────────────────────────────
+if len(anos) == 2 and 2025 in anos and 2026 in anos:
+    st.markdown("<div class='sec'>📊 Variação 2025 → 2026</div>", unsafe_allow_html=True)
+    cid25 = df[df["Ano"]==2025].groupby(["CID","Diagnostico"]).size().reset_index(name="Q25")
+    cid26 = df[df["Ano"]==2026].groupby(["CID","Diagnostico"]).size().reset_index(name="Q26")
+    cid_var = cid25.merge(cid26, on=["CID","Diagnostico"], how="outer").fillna(0)
+    cid_var["Var"] = cid_var["Q26"] - cid_var["Q25"]
+    cid_var["Var_Pct"] = ((cid_var["Q26"]-cid_var["Q25"])/cid_var["Q25"].replace(0,1)*100).round(1)
+    cid_var["Total"] = cid_var["Q25"] + cid_var["Q26"]
+    cid_var = cid_var.sort_values("Total", ascending=False).head(top_n)
+    cid_var_sorted = cid_var.sort_values("Var")
 
-if 2025 in anos and 2026 in anos:
-    cid_25 = cids_df[cids_df["Ano"]==2025][["CID","Diagnostico","Especialidade","Qtd"]].rename(columns={"Qtd":"Qtd_2025"})
-    cid_26 = cids_df[cids_df["Ano"]==2026][["CID","Diagnostico","Especialidade","Qtd"]].rename(columns={"Qtd":"Qtd_2026"})
-    cid_merge = cid_25.merge(cid_26, on=["CID","Diagnostico","Especialidade"])
-    cid_merge = cid_merge[cid_merge["Especialidade"].isin(esp_sel)]
-    cid_merge["Variacao"] = cid_merge["Qtd_2026"] - cid_merge["Qtd_2025"]
-    cid_merge["Var_Pct"]  = ((cid_merge["Qtd_2026"] - cid_merge["Qtd_2025"]) / cid_merge["Qtd_2025"] * 100).round(1)
-    cid_merge["Total"]    = cid_merge["Qtd_2025"] + cid_merge["Qtd_2026"]
-    cid_merge = cid_merge.sort_values("Variacao")
-
-    cv1, cv2 = st.columns(2)
-
-    with cv1:
-        fig_var = go.Figure(go.Bar(
-            x=cid_merge["CID"],
-            y=cid_merge["Variacao"],
-            marker_color=[GREEN if v >= 0 else RED for v in cid_merge["Variacao"]],
-            text=cid_merge["Variacao"].apply(lambda v: f"+{v}" if v >= 0 else str(v)),
-            textposition="outside",
-            textfont=dict(size=9),
-            hovertemplate="<b>%{x}</b><br>%{customdata}<br>Variação: %{y:+d}<extra></extra>",
-            customdata=cid_merge["Diagnostico"],
+    vv1, vv2 = st.columns(2)
+    with vv1:
+        fig_v = go.Figure(go.Bar(
+            x=cid_var_sorted["CID"],
+            y=cid_var_sorted["Var"],
+            marker_color=[GREEN if v>=0 else RED for v in cid_var_sorted["Var"]],
+            text=cid_var_sorted["Var"].apply(lambda v: f"+{int(v)}" if v>=0 else str(int(v))),
+            textposition="outside", textfont=dict(size=9),
+            hovertemplate="<b>%{x}</b><br>%{customdata}<br>Δ: %{y:+d}<extra></extra>",
+            customdata=cid_var_sorted["Diagnostico"],
         ))
-        fig_var.add_hline(y=0, line_dash="dash", line_color=GRAY, line_width=1)
-        fig_var.update_layout(
-            title="Variação absoluta por CID (2025 → 2026)",
-            plot_bgcolor="white",
-            paper_bgcolor="white",
-            margin=dict(t=50, b=40, l=10, r=10),
-            yaxis=dict(gridcolor="#f0f2f5", title="Δ casos"),
-            xaxis=dict(title="", tickangle=-45),
-            font=dict(family="Arial", size=11),
-            height=340,
-        )
-        st.plotly_chart(fig_var, use_container_width=True)
+        fig_v.add_hline(y=0, line_dash="dash", line_color=GRAY, line_width=1)
+        fig_v.update_layout(title=f"Variação por CID (top {top_n})",
+            plot_bgcolor="white", paper_bgcolor="white", height=340,
+            margin=dict(t=50,b=40,l=10,r=10),
+            yaxis=dict(gridcolor="#f0f2f5",title="Δ casos"),
+            xaxis=dict(tickangle=-45), font=dict(family="Arial",size=11))
+        st.plotly_chart(fig_v, use_container_width=True)
 
-    with cv2:
-        fig_sc = px.scatter(
-            cid_merge,
-            x="Qtd_2025", y="Qtd_2026",
-            size="Total",
-            color="Especialidade",
-            hover_name="Diagnostico",
-            hover_data={"Var_Pct": True, "Total": False},
-            color_discrete_sequence=px.colors.qualitative.Bold,
-            labels={"Qtd_2025":"Volume 2025","Qtd_2026":"Volume 2026"},
-            title="Volume 2025 vs 2026 por CID",
-        )
-        max_val = max(cid_merge["Qtd_2025"].max(), cid_merge["Qtd_2026"].max()) * 1.1
-        fig_sc.add_shape(type="line",
-                         x0=0, y0=0, x1=max_val, y1=max_val,
-                         line=dict(dash="dash", color=GRAY, width=1))
-        fig_sc.update_layout(
-            plot_bgcolor="white",
-            paper_bgcolor="white",
-            margin=dict(t=50, b=30, l=10, r=10),
-            font=dict(family="Arial", size=11),
-            legend=dict(font=dict(size=10)),
-            height=340,
-        )
+    with vv2:
+        fig_sc = px.scatter(cid_var, x="Q25", y="Q26",
+            size="Total", hover_name="Diagnostico",
+            hover_data={"Var_Pct":True,"Total":False,"Q25":False,"Q26":False},
+            labels={"Q25":"Volume 2025","Q26":"Volume 2026"},
+            title=f"Volume 2025 vs 2026 (top {top_n} CIDs)",
+            color_discrete_sequence=[BLUE])
+        mx = max(cid_var["Q25"].max(), cid_var["Q26"].max())*1.1
+        fig_sc.add_shape(type="line",x0=0,y0=0,x1=mx,y1=mx,
+                         line=dict(dash="dash",color=GRAY,width=1))
+        fig_sc.update_layout(plot_bgcolor="white",paper_bgcolor="white",
+            height=340,margin=dict(t=50,b=30,l=10,r=10),
+            font=dict(family="Arial",size=11))
         st.plotly_chart(fig_sc, use_container_width=True)
 
-    st.caption("Na linha de referência diagonal: crescimento igual ao de 2025. Acima da linha = aceleração. Abaixo = redução.")
-
-else:
-    st.info("Selecione ambos os anos na sidebar para ver a análise de variação.", icon="ℹ️")
-
-# ════════════════════════════════════════════════════════════════════════════
-# TABELA DETALHADA
-# ════════════════════════════════════════════════════════════════════════════
-with st.expander("📋 Ver tabela de dados completa"):
-    tab_sel = st.radio("Tabela", ["Mensal","CIDs","Faixa Etária","Tempo de Espera"],
-                       horizontal=True)
-    if tab_sel == "Mensal":
-        df_show = mensal_f[["Ano","Mes","Encaminhamentos","Tempo_Med_Min"]].copy()
-        df_show.columns = ["Ano","Mês","Encaminhamentos","Tempo Médio (min)"]
-        st.dataframe(df_show, use_container_width=True, hide_index=True)
-    elif tab_sel == "CIDs":
-        df_show = cids_f.groupby(["CID","Diagnostico","Especialidade","Ano"])["Qtd"].sum().reset_index()
-        df_show.columns = ["CID","Diagnóstico","Especialidade","Ano","Qtd"]
-        st.dataframe(df_show.sort_values(["Ano","Qtd"], ascending=[True,False]),
+# ── TABELA ────────────────────────────────────────────────────────────────────
+with st.expander("📋 Ver dados filtrados"):
+    tab = st.radio("Visualizar", ["Resumo mensal","Por unidade","CIDs","Faixa etária"],
+                   horizontal=True)
+    if tab == "Resumo mensal":
+        t = df.groupby(["Ano","Mes","Mes_Num"]).agg(
+            Encaminhamentos=("CID","count"),
+            Tempo_Med_Min=("Tempo_Min","mean")
+        ).reset_index().sort_values(["Ano","Mes_Num"])
+        t["Tempo_Med_Min"] = t["Tempo_Med_Min"].round(0).astype("Int64")
+        t = t.drop(columns="Mes_Num")
+        st.dataframe(t, use_container_width=True, hide_index=True)
+    elif tab == "Por unidade":
+        t = df.groupby(["Unidade","Ano"]).agg(
+            Encaminhamentos=("CID","count"),
+            Tempo_Med_Min=("Tempo_Min","mean")
+        ).reset_index()
+        t["Tempo_Med_Min"] = t["Tempo_Med_Min"].round(0).astype("Int64")
+        st.dataframe(t.sort_values(["Ano","Encaminhamentos"],ascending=[True,False]),
                      use_container_width=True, hide_index=True)
-    elif tab_sel == "Faixa Etária":
-        st.dataframe(faixa_f, use_container_width=True, hide_index=True)
+    elif tab == "CIDs":
+        t = df.dropna(subset=["CID"]).groupby(["CID","Diagnostico","Ano"]).size().reset_index(name="Qtd")
+        st.dataframe(t.sort_values(["Ano","Qtd"],ascending=[True,False]),
+                     use_container_width=True, hide_index=True)
     else:
-        st.dataframe(tempo_f, use_container_width=True, hide_index=True)
+        t = df.groupby(["Faixa_Etaria","Ano"]).size().reset_index(name="Qtd")
+        st.dataframe(t, use_container_width=True, hide_index=True)
 
 st.divider()
-st.caption("CORE/CG · Central de Regulação de Ofertas de Serviços de Saúde · Campo Grande/MS  |  "
-           "Dados: Jan–Mai 2025 (16.689 encam.) e Jan–Mai 2026 (21.209 encam.)  |  "
-           "*Maio/2026 parcial até 20/05/2026")
+st.caption(f"Exibindo {len(df):,} de {len(df_raw):,} registros com os filtros selecionados  |  "
+           "CORE/CG · *Maio/2026 parcial até 20/05/2026".replace(",","."))
